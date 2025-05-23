@@ -1,17 +1,19 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const LoginRegister = () => {
   const { userType } = useParams<{ userType: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Form states
   const [email, setEmail] = useState<string>("");
@@ -24,66 +26,172 @@ const LoginRegister = () => {
   const [officerEmail, setOfficerEmail] = useState<string>("");
   const [officerMobile, setOfficerMobile] = useState<string>("");
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Simulate login (replace with actual authentication)
-    if (email && password) {
-      if (userType === "student") {
-        navigate("/student/dashboard");
-      } else if (userType === "college") {
-        navigate("/college/dashboard");
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Redirect based on user type
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.user_type === 'student') {
+          navigate('/student/dashboard');
+        } else if (profile?.user_type === 'college') {
+          navigate('/college/dashboard');
+        }
       }
-      
-      toast({
-        title: "Login Successful",
-        description: `Welcome back!`,
+    };
+    
+    checkUser();
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-    } else {
+
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.user) {
+        // Get user profile to determine redirect
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile?.user_type === 'student') {
+          navigate('/student/dashboard');
+        } else if (profile?.user_type === 'college') {
+          navigate('/college/dashboard');
+        }
+
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+      }
+    } catch (error) {
       toast({
         title: "Login Failed",
-        description: "Email and password are required.",
+        description: "An unexpected error occurred.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Simulate registration (replace with actual registration)
-    if (userType === "student") {
-      if (!email || !password || !name || !mobile || !collegeName) {
+    try {
+      // Validate required fields based on user type
+      if (userType === "student") {
+        if (!email || !password || !name || !mobile || !collegeName) {
+          toast({
+            title: "Registration Failed",
+            description: "Please fill all required fields.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (userType === "college") {
+        if (!email || !password || !collegeName || !collegeId || !placementOfficer || !officerEmail || !officerMobile) {
+          toast({
+            title: "Registration Failed",
+            description: "Please fill all required fields.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Create user account
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            user_type: userType,
+          }
+        }
+      });
+
+      if (error) {
         toast({
           title: "Registration Failed",
-          description: "Please fill all required fields.",
+          description: error.message,
           variant: "destructive",
         });
         return;
       }
-      
-      // TODO: Check if college exists before allowing registration
-      
-      navigate("/student/profile");
-      toast({
-        title: "Registration Successful",
-        description: "Please complete your profile.",
-      });
-    } else if (userType === "college") {
-      if (!email || !password || !collegeName || !collegeId || !placementOfficer || !officerEmail || !officerMobile) {
+
+      if (data.user) {
+        // Insert additional user data based on type
+        if (userType === "student") {
+          const { error: studentError } = await supabase
+            .from('students')
+            .insert({
+              id: data.user.id,
+              full_name: name,
+              mobile,
+              college_name: collegeName,
+            });
+
+          if (studentError) {
+            console.error("Error creating student profile:", studentError);
+          }
+        } else if (userType === "college") {
+          const { error: collegeError } = await supabase
+            .from('colleges')
+            .insert({
+              id: data.user.id,
+              college_name: collegeName,
+              college_id: collegeId,
+              placement_officer_name: placementOfficer,
+              officer_email: officerEmail,
+              officer_mobile: officerMobile,
+            });
+
+          if (collegeError) {
+            console.error("Error creating college profile:", collegeError);
+          }
+        }
+
         toast({
-          title: "Registration Failed",
-          description: "Please fill all required fields.",
-          variant: "destructive",
+          title: "Registration Successful",
+          description: "Please check your email to verify your account before logging in.",
         });
-        return;
+        
+        // Switch to login tab
+        setActiveTab("login");
       }
-      
-      navigate("/college/dashboard");
+    } catch (error) {
       toast({
-        title: "Registration Successful",
-        description: "Welcome to Placement & Academic Hub!",
+        title: "Registration Failed",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -117,6 +225,7 @@ const LoginRegister = () => {
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
                     required 
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -128,10 +237,11 @@ const LoginRegister = () => {
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     required 
+                    disabled={isLoading}
                   />
                 </div>
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
-                  Login
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isLoading}>
+                  {isLoading ? "Logging in..." : "Login"}
                 </Button>
               </form>
             </TabsContent>
@@ -148,6 +258,7 @@ const LoginRegister = () => {
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
                     required 
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -155,10 +266,12 @@ const LoginRegister = () => {
                   <Input 
                     id="reg-password" 
                     type="password" 
-                    placeholder="Create a password" 
+                    placeholder="Create a password (min 6 characters)" 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     required 
+                    minLength={6}
+                    disabled={isLoading}
                   />
                 </div>
                 
@@ -173,6 +286,7 @@ const LoginRegister = () => {
                         value={name} 
                         onChange={(e) => setName(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -184,6 +298,7 @@ const LoginRegister = () => {
                         value={mobile} 
                         onChange={(e) => setMobile(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -195,6 +310,7 @@ const LoginRegister = () => {
                         value={collegeName} 
                         onChange={(e) => setCollegeName(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                   </>
@@ -211,6 +327,7 @@ const LoginRegister = () => {
                         value={collegeName} 
                         onChange={(e) => setCollegeName(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -222,6 +339,7 @@ const LoginRegister = () => {
                         value={collegeId} 
                         onChange={(e) => setCollegeId(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -233,6 +351,7 @@ const LoginRegister = () => {
                         value={placementOfficer} 
                         onChange={(e) => setPlacementOfficer(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -244,6 +363,7 @@ const LoginRegister = () => {
                         value={officerEmail} 
                         onChange={(e) => setOfficerEmail(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -255,13 +375,14 @@ const LoginRegister = () => {
                         value={officerMobile} 
                         onChange={(e) => setOfficerMobile(e.target.value)} 
                         required 
+                        disabled={isLoading}
                       />
                     </div>
                   </>
                 )}
                 
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
-                  Register
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isLoading}>
+                  {isLoading ? "Creating Account..." : "Register"}
                 </Button>
               </form>
             </TabsContent>

@@ -9,7 +9,126 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      colleges: {
+        Row: {
+          college_id: string
+          college_name: string
+          created_at: string
+          established_year: number | null
+          id: string
+          location: string | null
+          officer_email: string
+          officer_mobile: string
+          placement_officer_name: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          college_id: string
+          college_name: string
+          created_at?: string
+          established_year?: number | null
+          id: string
+          location?: string | null
+          officer_email: string
+          officer_mobile: string
+          placement_officer_name: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          college_id?: string
+          college_name?: string
+          created_at?: string
+          established_year?: number | null
+          id?: string
+          location?: string | null
+          officer_email?: string
+          officer_mobile?: string
+          placement_officer_name?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          updated_at: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          updated_at?: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          updated_at?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          cgpa: number | null
+          college_name: string
+          course: string | null
+          created_at: string
+          full_name: string
+          github_url: string | null
+          id: string
+          linkedin_url: string | null
+          mobile: string
+          placement_status: string | null
+          portfolio_url: string | null
+          resume_url: string | null
+          skills: string[] | null
+          updated_at: string
+          year_of_study: number | null
+        }
+        Insert: {
+          cgpa?: number | null
+          college_name: string
+          course?: string | null
+          created_at?: string
+          full_name: string
+          github_url?: string | null
+          id: string
+          linkedin_url?: string | null
+          mobile: string
+          placement_status?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          skills?: string[] | null
+          updated_at?: string
+          year_of_study?: number | null
+        }
+        Update: {
+          cgpa?: number | null
+          college_name?: string
+          course?: string | null
+          created_at?: string
+          full_name?: string
+          github_url?: string | null
+          id?: string
+          linkedin_url?: string | null
+          mobile?: string
+          placement_status?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          skills?: string[] | null
+          updated_at?: string
+          year_of_study?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
