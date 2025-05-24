@@ -17,19 +17,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredUserT
     const checkAuth = async () => {
       if (!loading) {
         if (!user) {
-          navigate('/');
+          console.log('No user found, redirecting to home');
+          navigate('/', { replace: true });
           return;
         }
 
         if (requiredUserType) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('user_type')
-            .eq('id', user.id)
-            .single();
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('user_type')
+              .eq('id', user.id)
+              .single();
 
-          if (profile?.user_type !== requiredUserType) {
-            navigate('/');
+            if (profile?.user_type !== requiredUserType) {
+              console.log('User type mismatch, redirecting to home');
+              navigate('/', { replace: true });
+              return;
+            }
+          } catch (error) {
+            console.error('Error checking user type:', error);
+            navigate('/', { replace: true });
             return;
           }
         }

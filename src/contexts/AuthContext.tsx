@@ -26,25 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
-        
-        if (event === 'SIGNED_OUT') {
-          // Clear all state immediately on sign out
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-        } else {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-        }
-      }
-    );
-
-    // Get initial session
+    // Get initial session first
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -63,21 +45,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getInitialSession();
 
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        
+        if (event === 'SIGNED_OUT') {
+          // Clear all state immediately on sign out
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          // Force navigation to home page
+          window.location.href = '/';
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      }
+    );
+
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
     try {
       setLoading(true);
+      // Clear state first
+      setSession(null);
+      setUser(null);
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
       }
-      // Clear state immediately
-      setSession(null);
-      setUser(null);
+      
+      // Force redirect to home page
+      window.location.href = '/';
     } catch (error) {
       console.error('Error in signOut:', error);
+      // Even if there's an error, redirect to home
+      window.location.href = '/';
     } finally {
       setLoading(false);
     }
