@@ -6,48 +6,79 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LoginRegister = () => {
   const { userType } = useParams<{ userType: string }>();
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("login");
   const [isLoading, setIsLoading] = useState(false);
+  const [registeredColleges, setRegisteredColleges] = useState<Array<{id: string, college_name: string}>>([]);
 
   // Form states
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [name, setName] = useState<string>("");
   const [mobile, setMobile] = useState<string>("");
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>("");
   const [collegeName, setCollegeName] = useState<string>("");
   const [collegeId, setCollegeId] = useState<string>("");
   const [placementOfficer, setPlacementOfficer] = useState<string>("");
   const [officerEmail, setOfficerEmail] = useState<string>("");
   const [officerMobile, setOfficerMobile] = useState<string>("");
 
-  // Check if user is already authenticated
+  // Load registered colleges for student registration
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Redirect based on user type
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (profile?.user_type === 'student') {
-          navigate('/student/dashboard');
-        } else if (profile?.user_type === 'college') {
-          navigate('/college/dashboard');
+    const loadColleges = async () => {
+      if (userType === "student") {
+        try {
+          const { data, error } = await supabase
+            .from('colleges')
+            .select('id, college_name')
+            .order('college_name');
+          
+          if (error) {
+            console.error('Error loading colleges:', error);
+          } else {
+            setRegisteredColleges(data || []);
+          }
+        } catch (error) {
+          console.error('Error fetching colleges:', error);
+        }
+      }
+    };
+
+    loadColleges();
+  }, [userType]);
+
+  // Check if user is already authenticated and redirect
+  useEffect(() => {
+    const checkAuthAndRedirect = async () => {
+      if (!loading && user) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('user_type')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile?.user_type === 'student') {
+            navigate('/student/dashboard');
+          } else if (profile?.user_type === 'college') {
+            navigate('/college/dashboard');
+          }
+        } catch (error) {
+          console.error('Error checking user profile:', error);
         }
       }
     };
     
-    checkUser();
-  }, [navigate]);
+    checkAuthAndRedirect();
+  }, [user, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +105,7 @@ const LoginRegister = () => {
           .from('profiles')
           .select('user_type')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (profile?.user_type === 'student') {
           navigate('/student/dashboard');
@@ -105,7 +136,7 @@ const LoginRegister = () => {
     try {
       // Validate required fields based on user type
       if (userType === "student") {
-        if (!email || !password || !name || !mobile || !collegeName) {
+        if (!email || !password || !name || !mobile || !selectedCollegeId) {
           toast({
             title: "Registration Failed",
             description: "Please fill all required fields.",
@@ -147,13 +178,16 @@ const LoginRegister = () => {
       if (data.user) {
         // Insert additional user data based on type
         if (userType === "student") {
+          // Get selected college name
+          const selectedCollege = registeredColleges.find(college => college.id === selectedCollegeId);
+          
           const { error: studentError } = await supabase
             .from('students')
             .insert({
               id: data.user.id,
               full_name: name,
               mobile,
-              college_name: collegeName,
+              college_name: selectedCollege?.college_name || "",
             });
 
           if (studentError) {
@@ -302,16 +336,19 @@ const LoginRegister = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="college-name">College Name</Label>
-                      <Input 
-                        id="college-name" 
-                        type="text" 
-                        placeholder="Enter your college name" 
-                        value={collegeName} 
-                        onChange={(e) => setCollegeName(e.target.value)} 
-                        required 
-                        disabled={isLoading}
-                      />
+                      <Label htmlFor="college-select">Select College</Label>
+                      <Select value={selectedCollegeId} onValueChange={setSelectedCollegeId} disabled={isLoading}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose your college" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {registeredColleges.map((college) => (
+                            <SelectItem key={college.id} value={college.id}>
+                              {college.college_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </>
                 )}

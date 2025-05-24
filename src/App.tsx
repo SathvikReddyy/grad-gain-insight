@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import LoginRegister from "./pages/LoginRegister";
@@ -29,13 +30,62 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login/:userType" element={<LoginRegister />} />
             <Route path="/register/:userType" element={<LoginRegister />} />
-            <Route path="/student/dashboard" element={<StudentDashboard />} />
-            <Route path="/student/profile" element={<StudentProfile />} />
-            <Route path="/student/resume-builder" element={<ResumeBuilder />} />
-            <Route path="/student/skill-suggester" element={<SkillSuggester />} />
-            <Route path="/college/dashboard" element={<CollegeDashboard />} />
-            <Route path="/college/search-students" element={<SearchStudents />} />
-            <Route path="/college/placement-analytics" element={<PlacementAnalytics />} />
+            <Route 
+              path="/student/dashboard" 
+              element={
+                <ProtectedRoute requiredUserType="student">
+                  <StudentDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/student/profile" 
+              element={
+                <ProtectedRoute requiredUserType="student">
+                  <StudentProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/student/resume-builder" 
+              element={
+                <ProtectedRoute requiredUserType="student">
+                  <ResumeBuilder />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/student/skill-suggester" 
+              element={
+                <ProtectedRoute requiredUserType="student">
+                  <SkillSuggester />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/college/dashboard" 
+              element={
+                <ProtectedRoute requiredUserType="college">
+                  <CollegeDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/college/search-students" 
+              element={
+                <ProtectedRoute requiredUserType="college">
+                  <SearchStudents />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/college/placement-analytics" 
+              element={
+                <ProtectedRoute requiredUserType="college">
+                  <PlacementAnalytics />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
