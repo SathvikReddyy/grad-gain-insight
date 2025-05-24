@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
         
         if (event === 'SIGNED_OUT') {
@@ -55,8 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(null);
           setUser(null);
           setLoading(false);
-          // Force navigation to home page
-          window.location.href = '/';
+          // Force navigation to home page immediately
+          console.log('Forcing redirect to home page');
+          window.location.replace('/');
         } else {
           setSession(session);
           setUser(session?.user ?? null);
@@ -69,25 +70,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
+    console.log('SignOut function called');
     try {
       setLoading(true);
-      // Clear state first
+      
+      // Clear state immediately first
       setSession(null);
       setUser(null);
       
+      // Call Supabase signOut
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
+      } else {
+        console.log('Supabase signOut successful');
       }
       
-      // Force redirect to home page
-      window.location.href = '/';
+      // Force redirect regardless of Supabase call result
+      console.log('Forcing immediate redirect');
+      window.location.replace('/');
+      
     } catch (error) {
       console.error('Error in signOut:', error);
-      // Even if there's an error, redirect to home
-      window.location.href = '/';
-    } finally {
-      setLoading(false);
+      // Force redirect even on error
+      window.location.replace('/');
     }
   };
 

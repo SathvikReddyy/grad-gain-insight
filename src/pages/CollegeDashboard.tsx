@@ -3,16 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, ChartBar } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CollegeDashboard = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    console.log('College logout clicked');
+    await signOut();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="container mx-auto px-4 py-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-indigo-700">College Dashboard</h1>
-          <Button variant="outline" onClick={() => navigate("/")}>Logout</Button>
+          <Button variant="outline" onClick={handleLogout}>Logout</Button>
         </div>
       </header>
       
