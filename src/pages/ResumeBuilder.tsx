@@ -4,64 +4,105 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock student data - in a real app, this would be fetched from a database
-const mockStudentData = {
-  name: "John Doe",
-  email: "john.doe@example.com",
-  phone: "123-456-7890",
-  skills: "JavaScript, React, Node.js, HTML, CSS",
-  education: [
-    {
-      degree: "Bachelor of Technology",
-      institution: "Example University",
-      year: "2019-2023",
-      score: "8.5 CGPA"
-    }
-  ],
-  projects: [
-    {
-      title: "E-commerce Website",
-      description: "Built a full-stack e-commerce platform with React and Node.js",
-      techStack: "React, Node.js, Express, MongoDB"
-    },
-    {
-      title: "Student Management System",
-      description: "Developed a system to track student performance and attendance",
-      techStack: "Java, Spring Boot, MySQL"
-    }
-  ],
-  experience: [
-    {
-      position: "Software Developer Intern",
-      company: "Tech Solutions Inc.",
-      duration: "May 2022 - Jul 2022",
-      responsibilities: "Developed features for the company's main product using React.js"
-    }
-  ]
-};
+interface StudentData {
+  name: string;
+  email: string;
+  phone: string;
+  skills: string;
+  education: Array<{
+    degree: string;
+    institution: string;
+    year: string;
+    score: string;
+  }>;
+  projects: Array<{
+    title: string;
+    description: string;
+    techStack: string;
+  }>;
+  experience: Array<{
+    position: string;
+    company: string;
+    duration: string;
+    responsibilities: string;
+  }>;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+}
 
 const ResumeBuilder = () => {
   const navigate = useNavigate();
-  const [isProfileComplete, setIsProfileComplete] = useState(true); // For demo purposes, set to true
-  const [studentData, setStudentData] = useState(mockStudentData);
+  const { user, signOut } = useAuth();
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
+  const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [resumeGenerated, setResumeGenerated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // In a real app, check if profile is complete
+  // Load student data
   useEffect(() => {
-    // Simulating profile check
-    // If profile is not complete, show a message
+    const loadStudentData = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error loading student data:', error);
+          setIsProfileComplete(false);
+        } else if (data) {
+          // Check if profile has essential information
+          const hasBasicInfo = data.full_name && data.mobile && data.college_name;
+          setIsProfileComplete(hasBasicInfo);
+          
+          if (hasBasicInfo) {
+            setStudentData({
+              name: data.full_name,
+              email: user.email || "",
+              phone: data.mobile,
+              skills: data.skills ? data.skills.join(', ') : "",
+              education: [{
+                degree: data.course || "Not specified",
+                institution: data.college_name,
+                year: data.year_of_study ? `${data.year_of_study} Year` : "Not specified",
+                score: data.cgpa ? `${data.cgpa} CGPA` : "Not specified"
+              }],
+              projects: [], // These would need separate tables in a real app
+              experience: [], // These would need separate tables in a real app
+              linkedinUrl: data.linkedin_url,
+              githubUrl: data.github_url,
+              portfolioUrl: data.portfolio_url
+            });
+          }
+        } else {
+          setIsProfileComplete(false);
+        }
+      } catch (error) {
+        console.error('Error fetching student data:', error);
+        setIsProfileComplete(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStudentData();
+  }, [user]);
+
+  const generateResume = () => {
     if (!isProfileComplete) {
       toast({
         title: "Profile Incomplete",
         description: "Please complete your profile before generating a resume.",
         variant: "destructive",
       });
-    }
-  }, [isProfileComplete]);
-
-  const generateResume = () => {
-    if (!isProfileComplete) {
       navigate("/student/profile");
       return;
     }
@@ -73,6 +114,19 @@ const ResumeBuilder = () => {
     });
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -82,7 +136,7 @@ const ResumeBuilder = () => {
             <Button variant="outline" onClick={() => navigate("/student/dashboard")}>
               Dashboard
             </Button>
-            <Button variant="outline" onClick={() => navigate("/")}>
+            <Button variant="outline" onClick={handleLogout}>
               Logout
             </Button>
           </div>
@@ -106,7 +160,9 @@ const ResumeBuilder = () => {
               </Button>
               
               {!isProfileComplete && (
-                <p className="text-sm text-red-500 mt-2">Complete your profile first</p>
+                <p className="text-sm text-red-500 mt-2">
+                  Complete your profile first - we need at least your name, mobile, and college name.
+                </p>
               )}
             </div>
           ) : (
@@ -123,7 +179,7 @@ const ResumeBuilder = () => {
             </div>
           )}
           
-          {resumeGenerated && (
+          {resumeGenerated && studentData && (
             <Card className="mb-8 print:shadow-none print:border-none" id="resume-template">
               <CardContent className="p-8">
                 {/* Resume Header */}
@@ -132,14 +188,22 @@ const ResumeBuilder = () => {
                   <div className="flex flex-wrap justify-center gap-x-4 text-sm text-gray-600 mt-2">
                     <span>{studentData.email}</span>
                     <span>{studentData.phone}</span>
+                    {studentData.linkedinUrl && (
+                      <span>LinkedIn: {studentData.linkedinUrl}</span>
+                    )}
+                    {studentData.githubUrl && (
+                      <span>GitHub: {studentData.githubUrl}</span>
+                    )}
                   </div>
                 </div>
                 
                 {/* Skills Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-1 mb-2">Skills</h3>
-                  <p>{studentData.skills}</p>
-                </div>
+                {studentData.skills && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-1 mb-2">Skills</h3>
+                    <p>{studentData.skills}</p>
+                  </div>
+                )}
                 
                 {/* Education Section */}
                 <div className="mb-6">
@@ -151,27 +215,39 @@ const ResumeBuilder = () => {
                         <span className="text-sm">{edu.year}</span>
                       </div>
                       <p className="text-gray-700">{edu.institution}</p>
-                      <p className="text-sm text-gray-600">CGPA/Percentage: {edu.score}</p>
+                      <p className="text-sm text-gray-600">Score: {edu.score}</p>
                     </div>
                   ))}
                 </div>
                 
-                {/* Projects Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-1 mb-2">Projects</h3>
-                  {studentData.projects.map((project, index) => (
-                    <div key={index} className="mb-3">
-                      <h4 className="font-medium">{project.title}</h4>
-                      <p className="text-sm">{project.description}</p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Tech Stack:</span> {project.techStack}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                {/* Portfolio Section */}
+                {studentData.portfolioUrl && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-1 mb-2">Portfolio</h3>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">Portfolio URL:</span> {studentData.portfolioUrl}
+                    </p>
+                  </div>
+                )}
                 
-                {/* Experience Section */}
-                {studentData.experience && studentData.experience.length > 0 && (
+                {/* Projects Section - placeholder for future implementation */}
+                {studentData.projects.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-1 mb-2">Projects</h3>
+                    {studentData.projects.map((project, index) => (
+                      <div key={index} className="mb-3">
+                        <h4 className="font-medium">{project.title}</h4>
+                        <p className="text-sm">{project.description}</p>
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Tech Stack:</span> {project.techStack}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Experience Section - placeholder for future implementation */}
+                {studentData.experience.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-1 mb-2">Experience</h3>
                     {studentData.experience.map((exp, index) => (

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-// Mock in-demand skills data
+// In-demand skills data
 const inDemandSkills = {
   technical: [
     "React", "Node.js", "Python", "Data Science", "Machine Learning", 
@@ -31,12 +30,14 @@ const SkillSuggester = () => {
   const [skillGap, setSkillGap] = useState<string[]>([]);
   const [matchedSkills, setMatchedSkills] = useState<string[]>([]);
   const [profileSkills, setProfileSkills] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load student's profile skills
   useEffect(() => {
     const loadStudentSkills = async () => {
       if (!user) return;
       
+      setIsLoading(true);
       try {
         const { data, error } = await supabase
           .from('students')
@@ -46,12 +47,14 @@ const SkillSuggester = () => {
 
         if (error) {
           console.error('Error loading student skills:', error);
-        } else if (data && data.skills) {
+        } else if (data && data.skills && data.skills.length > 0) {
           setProfileSkills(data.skills);
           setUserSkills(data.skills.join(', '));
         }
       } catch (error) {
         console.error('Error fetching student skills:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -63,7 +66,7 @@ const SkillSuggester = () => {
       return;
     }
     
-    // Simple skill comparison (in a real app, this would be more sophisticated)
+    // Simple skill comparison
     const userSkillsArray = userSkills.split(',').map(skill => skill.trim().toLowerCase());
     
     const allInDemandSkills = [...inDemandSkills.technical, ...inDemandSkills.soft]
@@ -88,6 +91,14 @@ const SkillSuggester = () => {
     await signOut();
     navigate("/");
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute requiredUserType="student">
@@ -117,7 +128,7 @@ const SkillSuggester = () => {
                   <p className="text-gray-600">
                     {profileSkills.length > 0 
                       ? "Your skills from your profile are loaded below. You can modify them if needed to compare with current industry demands."
-                      : "Enter your skills below (separated by commas) to compare them with current industry demands."
+                      : "No skills found in your profile. Please add skills in your profile first, or enter them below to compare with current industry demands."
                     }
                   </p>
                   
