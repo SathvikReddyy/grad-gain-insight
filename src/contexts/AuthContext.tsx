@@ -24,6 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     // Get initial session first
@@ -50,15 +51,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
         
+        // If we're in the middle of signing out, ignore any auth state changes
+        if (isSigningOut) {
+          console.log('Ignoring auth state change during signout');
+          return;
+        }
+        
         if (event === 'SIGNED_OUT') {
-          // Clear all state immediately on sign out
+          console.log('SIGNED_OUT event received');
           setSession(null);
           setUser(null);
           setLoading(false);
-          // Force navigation to home page immediately
-          console.log('Forcing redirect to home page');
+          // Navigate to home page
           window.location.replace('/');
-        } else {
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
@@ -67,26 +73,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isSigningOut]);
 
   const signOut = async () => {
     console.log('SignOut function called');
+    setIsSigningOut(true);
+    
     try {
-      setLoading(true);
-      
-      // Clear state immediately first
+      // Clear state immediately
       setSession(null);
       setUser(null);
+      setLoading(false);
       
-      // Call Supabase signOut
-      const { error } = await supabase.auth.signOut();
-      if (error) {
+      // Clear any stored session data
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+      
+      // Call Supabase signOut (but don't wait for it)
+      supabase.auth.signOut().catch(error => {
         console.error('Error signing out:', error);
-      } else {
-        console.log('Supabase signOut successful');
-      }
+      });
       
-      // Force redirect regardless of Supabase call result
+      // Force immediate redirect
       console.log('Forcing immediate redirect');
       window.location.replace('/');
       
