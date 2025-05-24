@@ -68,7 +68,7 @@ const ResumeBuilder = () => {
               name: data.full_name,
               email: user.email || "",
               phone: data.mobile,
-              skills: data.skills ? data.skills.join(', ') : "",
+              skills: Array.isArray(data.skills) ? data.skills.join(', ') : (data.skills || ""),
               education: [{
                 degree: data.course || "Not specified",
                 institution: data.college_name,
