@@ -60,7 +60,7 @@ const ResumeBuilder = () => {
           setIsProfileComplete(false);
         } else if (data) {
           // Check if profile has essential information
-          const hasBasicInfo = data.full_name && data.mobile && data.college_name;
+          const hasBasicInfo = Boolean(data.full_name && data.mobile && data.college_name);
           setIsProfileComplete(hasBasicInfo);
           
           if (hasBasicInfo) {
